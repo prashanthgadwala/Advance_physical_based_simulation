@@ -100,18 +100,22 @@ namespace physsim
             // TODO: analytical solution
             // x(t) = x_0 + v_0*t + 0.5*a*t^2
             // v(t) = v_0 + a*t
-            mPosition[EMethod::Analytic] = mInitialPosition; // <- adjust
-            mVelocity[EMethod::Analytic] = mInitialVelocity; // <- adjust
+            mPosition[EMethod::Analytic] = mInitialPosition + mInitialVelocity * mTime + 0.5 * mGravity * mTime * mTime; // <- adjust
+            mVelocity[EMethod::Analytic] = mInitialVelocity + mTime * mGravity; // <- adjust
             addSphere(mPosition[EMethod::Analytic], 0.03, Spectrum(1, 0, 0));
 
             // TODO: explicit euler
             // x' = x + dt*v
             // v' = v + dt*a
+            mPosition[EMethod::ExplicitEuler] = mPosition[EMethod::ExplicitEuler] + mStepSize * mVelocity[EMethod::ExplicitEuler];
+            mVelocity[EMethod::ExplicitEuler] = mVelocity[EMethod::ExplicitEuler] + mStepSize * mGravity;
             addSphere(mPosition[EMethod::ExplicitEuler], 0.03, Spectrum(0, 1, 0));
 
             // TODO: symplectic euler
             // v' = v + dt*a
             // x' = x + dt*v'
+            mVelocity[EMethod::SymplecticEuler] = mVelocity[EMethod::SymplecticEuler] + mStepSize * mGravity;
+            mPosition[EMethod::SymplecticEuler] = mPosition[EMethod::SymplecticEuler] + mStepSize * mVelocity[EMethod::SymplecticEuler];
             addSphere(mPosition[EMethod::SymplecticEuler], 0.03, Spectrum(0, 0, 1));
 
             mTime += mStepSize;
