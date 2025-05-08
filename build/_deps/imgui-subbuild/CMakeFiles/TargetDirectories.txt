@@ -1,0 +1,3 @@
+/Users/prashanthgadwala/Documents/Study material/Semester4/Physically-based Simulation in Computer Graphics/Exercises/physsim-ss25/build/_deps/imgui-subbuild/CMakeFiles/imgui-populate.dir
+/Users/prashanthgadwala/Documents/Study material/Semester4/Physically-based Simulation in Computer Graphics/Exercises/physsim-ss25/build/_deps/imgui-subbuild/CMakeFiles/edit_cache.dir
+/Users/prashanthgadwala/Documents/Study material/Semester4/Physically-based Simulation in Computer Graphics/Exercises/physsim-ss25/build/_deps/imgui-subbuild/CMakeFiles/rebuild_cache.dir
