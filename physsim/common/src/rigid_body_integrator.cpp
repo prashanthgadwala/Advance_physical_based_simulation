@@ -72,7 +72,7 @@ namespace physsim
         // TODO: compute new angular momentum
         Eigen::Matrix3d I    = body.inertiaWorld();
         Eigen::Vector3d l    = body.angularMomentum();
-        Eigen::vector3d w    = body.angularVelocity();
+        Eigen::Vector3d w    = body.angularVelocity();
         Eigen::Vector3d lnew = l + stepSize * (t - w.cross(I * w));
 
         // TODO: convert from angular momentum to angular velocity and update the body accordingly
@@ -126,7 +126,6 @@ namespace physsim
         Eigen::Matrix3d skew_wb = skew(wbWorld);
         Eigen::Matrix3d skew_Ib_wb = Ib * skew_wb;
         Eigen::Vector3d fwb0 = residual + skew_Ib_wb * wbWorld;
-        Eigen::Vector3d delta_wb;
         Eigen::Matrix3d Jwb = Ib * skew_wb;
         Eigen::Matrix3d JwbT = Jwb.transpose();
         Eigen::Matrix3d J = JwbT * Jwb;
@@ -141,7 +140,6 @@ namespace physsim
         Eigen::Vector3d delta_wbWorld0T3; 
 
         // TODO: Compute the Jacobian of f at wb. You can use the function "skew".
-        Eigen::Matrix3d J = Ib * skew(wbWorld);
         Eigen::Matrix3d Jt = J.transpose();
         Eigen::Matrix3d JtJ = Jt * J;
         Eigen::Matrix3d JtJInv = JtJ.inverse();
@@ -158,7 +156,7 @@ namespace physsim
 
         // TODO: explicitly integrate the torque and update the body accordingly
         Eigen::Vector3d lnew = body.inertiaWorld() * wnew;
-        body.setAngularMomentum(lnew);
+        body.angularMomentum() = lnew;
 
         // TODO: update position of the body using the linear velocity and update body accordingly
         Eigen::Vector3d xnew = x + stepSize * vnew;
