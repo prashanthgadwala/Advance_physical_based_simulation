@@ -72,7 +72,8 @@ namespace physsim
         // TODO: compute new angular momentum
         Eigen::Matrix3d I    = body.inertiaWorld();
         Eigen::Vector3d l    = body.angularMomentum();
-        Eigen::Vector3d lnew = l + stepSize * (t - v.cross(I * v));
+        Eigen::vector3d w    = body.angularVelocity();
+        Eigen::Vector3d lnew = l + stepSize * (t - w.cross(I * w));
 
         // TODO: convert from angular momentum to angular velocity and update the body accordingly
         Eigen::Vector3d wnew = body.inertiaWorldInverse() * lnew;
@@ -166,6 +167,7 @@ namespace physsim
         // TODO: quaternion-based angular velocity update of rotation
         Eigen::Quaterniond wq(0, wnew.x(), wnew.y(), wnew.z());
         Eigen::Quaterniond qnew = (q + 0.5 * stepSize * wq * q).normalized();
+        body.setRotation(qnew);
 
     }
 }
