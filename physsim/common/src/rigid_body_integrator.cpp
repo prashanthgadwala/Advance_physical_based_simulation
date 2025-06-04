@@ -90,82 +90,70 @@ namespace physsim
         body.setRotation(qnew);
     }
 
+
     void implicitEuler(RigidBody& body, double stepSize)
     {
-        // See for explanations: https://www.gdcvault.com/play/1022196/Physics-for-Game-Programmers-Numerical
-
-        // TODO: get current position and rotation of the body
+        // Get current state
         Eigen::Vector3d x    = body.position();
         Eigen::Quaterniond q = body.rotation();
-
-        // TODO: get current linear and angular momentum of body
-        Eigen::Vector3d p = body.linearMomentum();
-        Eigen::Vector3d v = body.linearVelocity();
-
-        // TODO: get force and torque that are currently applied to body
-        Eigen::Vector3d f = body.force();
-        Eigen::Vector3d t = body.torque();
-
-        // TODO: compute new linear momentum
+        Eigen::Vector3d p    = body.linearMomentum();
+        Eigen::Vector3d v    = body.linearVelocity();
+        Eigen::Vector3d f    = body.force();
+        Eigen::Vector3d t    = body.torque();
+    
+        // Linear momentum (explicit Euler)
         Eigen::Vector3d pnew = p + stepSize * f;
-
-
-        // TODO: convert from linear momentum to linear velocity and update the body accordingly
         Eigen::Vector3d vnew = body.massInverse() * pnew;
         body.setLinearVelocity(vnew);
-
-        // TODO: Convert current angular velocity to body coordinates (initial guess wb0)
-        Eigen::Vector3d wb0 = body.inertiaWorldInverse() * body.angularMomentum();
-        Eigen::Vector3d wb  = wb0;
-        Eigen::Vector3d wbWorld = body.rotation().inverse() * wb;
-
-        // TODO: Compute residual vector f(wb0) from the from angular velocity in body-coordinates
-        Eigen::Vector3d fwb = wb.cross(body.inertiaWorld() * wb) - t;
-        Eigen::Vector3d residual = fwb;
-        Eigen::Matrix3d Ib = body.inertiaWorldInverse();
-        Eigen::Matrix3d skew_wb = skew(wbWorld);
-        Eigen::Matrix3d skew_Ib_wb = Ib * skew_wb;
-        Eigen::Vector3d fwb0 = residual + skew_Ib_wb * wbWorld;
-        Eigen::Matrix3d Jwb = Ib * skew_wb;
-        Eigen::Matrix3d JwbT = Jwb.transpose();
-        Eigen::Matrix3d J = JwbT * Jwb;
-        Eigen::Vector3d fwb0T = fwb0.transpose();
-        Eigen::Vector3d delta_wb0;
-        Eigen::Vector3d delta_wbWorld;
-        Eigen::Vector3d delta_wbWorldT;
-        Eigen::Vector3d delta_wbWorld0;
-        Eigen::Vector3d delta_wb0T;
-        Eigen::Vector3d delta_wbWorld0T;
-        Eigen::Vector3d delta_wbWorld0T2;
-        Eigen::Vector3d delta_wbWorld0T3; 
-
-        // TODO: Compute the Jacobian of f at wb. You can use the function "skew".
-        Eigen::Matrix3d Jt = J.transpose();
-        Eigen::Matrix3d JtJ = Jt * J;
-        Eigen::Matrix3d JtJInv = JtJ.inverse();
-
-        // TODO: Linearly solve for the update step delta_wb, for example using a QR decomposition
-        Eigen::Vector3d delta_wb = J.colPivHouseholderQr().solve(-residual);
-        
-        // TODO: Apply the Newton-Raphson iteration by adding delta_wb to the current angular velocity
+    
+        // 1. Compute explicit torque update (excluding gyroscopic torque)
+        Eigen::Matrix3d Ib = body.inertiaBody(); // inertia in body coords
+        Eigen::Matrix3d Ib_inv = body.inertiaBodyInverse();
+        Eigen::Quaterniond q_inv = q.conjugate();
+    
+        // Transform angular velocity to body coordinates
+        Eigen::Vector3d w_world = body.angularVelocity();
+        Eigen::Vector3d wb0 = q_inv * w_world;
+    
+        // Compute explicit part: Δωt = Δt * Ib_inv * (q_inv * t)
+        Eigen::Vector3d tau_body = q_inv * t;
+        Eigen::Vector3d delta_wb_explicit = stepSize * Ib_inv * tau_body;
+    
+        // Initial guess for ωb (body coords) after explicit update
+        Eigen::Vector3d wb = wb0 + delta_wb_explicit;
+    
+        // 2. Newton step for implicit gyroscopic torque
+        // f(wb) = Ib(wb - wb0) + dt * wb × (Ib * wb)
+        Eigen::Vector3d fwb = Ib * (wb - wb0) + stepSize * wb.cross(Ib * wb);
+    
+        // Jacobian: J = Ib + dt * (skew(wb) * Ib - skew(Ib * wb))
+        Eigen::Matrix3d skew_wb = skew(wb);
+        Eigen::Matrix3d skew_Ib_wb = skew(Ib * wb);
+        Eigen::Matrix3d J = Ib + stepSize * (skew_wb * Ib - skew_Ib_wb);
+    
+        // Solve for Newton step: J * delta_wb = -fwb
+        Eigen::Vector3d delta_wb = J.colPivHouseholderQr().solve(-fwb);
+    
+        // Update ωb
         wb += delta_wb;
-
-        // TODO: Transform the angular velocity back to world coordinates
-        Eigen::Vector3d wnew = body.rotation() * wb;
+    
+        // Transform back to world coordinates
+        Eigen::Vector3d wnew = q * wb;
         body.setAngularVelocity(wnew);
-
-        // TODO: explicitly integrate the torque and update the body accordingly
-        Eigen::Vector3d lnew = body.inertiaWorld() * wnew;
+    
+        // Update angular momentum in world coordinates
+        Eigen::Matrix3d Iw = body.inertiaWorld();
+        Eigen::Vector3d lnew = Iw * wnew;
         body.angularMomentum() = lnew;
-
-        // TODO: update position of the body using the linear velocity and update body accordingly
+    
+        // Update position
         Eigen::Vector3d xnew = x + stepSize * vnew;
         body.setPosition(xnew);
-
-        // TODO: quaternion-based angular velocity update of rotation
+    
+        // Quaternion-based rotation update
         Eigen::Quaterniond wq(0, wnew.x(), wnew.y(), wnew.z());
         Eigen::Quaterniond qnew = (q + 0.5 * stepSize * wq * q).normalized();
         body.setRotation(qnew);
-
     }
+
 }
