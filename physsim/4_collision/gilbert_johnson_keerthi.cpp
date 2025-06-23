@@ -15,12 +15,17 @@ namespace physsim
         Eigen::Vector3d dir(1, 0, 0); // initial direction
 
         // TODO: find first point on Minkoswki difference (store in c)
+        c = support(A, B, dir);
 
         // TODO: revert search direction
+        dir = -c.P;
 
         // TODO: find second point on Minkoswki difference (store in b)
+        b = support(A, B, dir);
 
         // TODO: early out, if we cannot contain the origin (dot product)
+        if (b.P.dot(dir) <= 0)
+            return ret;
 
         // the next direction is perpendicular to line towards origin
         dir = (c.P - b.P).cross(-b.P).cross(c.P - b.P);
@@ -36,8 +41,11 @@ namespace physsim
         for (int iterations = 0; iterations < GJK_MAX_NUM_ITERATIONS; iterations++)
         {
             // TODO: find next point (store in a)
+            a = support(A, B, dir);
 
             // TODO: early out, if we cannot contain the origin (dot product)
+            if (a.P.dot(dir) <= 0)
+                return ret;
 
             // virtually add point a to simplex (technically, we have always allocate the memory for it)
             dim++;
@@ -54,8 +62,19 @@ namespace physsim
 
     Eigen::Vector3d GilbertJohnsonKeerthi::support(const TransformedMesh& mesh, const Eigen::Vector3d& d)
     {
-        // TODO: find the vertex of V that is farthest into direction d.
-        return Eigen::Vector3d(0, 0, 0);
+        double maxDot = -std::numeric_limits<double>::infinity();
+        Eigen::Vector3d best;
+        for (std::size_t i = 0; i < mesh.vertices.getSize(); ++i)
+        {
+            Eigen::Vector3d v = mesh.transform.transformPoint(mesh.vertices.getValue(i).cast<double>());
+            double dot = v.dot(d);
+            if (dot > maxDot)
+            {
+                maxDot = dot;
+                best = v;
+            }
+        }
+        return best;
     }
 
     GilbertJohnsonKeerthi::SupportVec GilbertJohnsonKeerthi::support(const TransformedMesh& A, const TransformedMesh& B, const Eigen::Vector3d& d)

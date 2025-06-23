@@ -231,7 +231,7 @@ namespace physsim
             case EMethod::ImplicitEuler:
             {
                 // TODO: implicit euler
-                v = (m * v - mStepSize * k * x + mStepSize * mGravity * m - mStepSize * k * L * spring_dir) / (k * mStepSize * mStepSize + gamma * mStepSize + m);
+                v = (m * v - mStepSize * k * x + mStepSize * mGravity * m + mStepSize * k * (L * spring_dir)) / (k * mStepSize * mStepSize + gamma * mStepSize + m);
 
                 x += mStepSize * v;
                 //v = mSpring.endVelocity + mStepSize * ( k/m *( x + L * spring_dir)  - gamma/m * v + mGravity);

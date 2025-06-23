@@ -72,16 +72,66 @@ namespace physsim
         {
             // TODO: compute bounding boxes and create intervals on the 3 main axes
 
+            std::vector<Eigen::AlignedBox3d> aabbs(mObjects.size());
+            for (std::size_t i = 0; i < aabbs.size(); i++)
+                aabbs[i] = mObjects[i]->worldBounds();
+
+            std::vector<std::pair<std::size_t, std::size_t>> overlaps[3];
+
+            for (int axis = 0; axis < 3; ++axis)
+            {
             // TODO: sort intervals in ascending order by beginning of interval
+                struct Interval {
+                    double min, max;
+                    std::size_t idx;
+                };
+
+                std::vector<Interval> intervals;
+
+                for (std::size_t i = 0; i < aabbs.size(); i++)
+                {
+                    intervals.push_back({aabbs[i].min()[axis], aabbs[i].max()[axis], i});
+                }
+                std::sort(intervals.begin(), intervals.end(),
+                        [](const Interval& a, const Interval& b) { return a.min < b.min; });
 
             // TODO: iterate and place overlaps in a set
+                for (std::size_t i = 0; i < intervals.size(); ++i)
+                {
+                    for (std::size_t j = i + 1; j < intervals.size(); ++j)
+                    {
+                        if (intervals[j].min > intervals[i].max)
+                            break; // No more overlaps possible
+                        // Only consider dynamic bodies
+                        if (mObjects[intervals[i].idx]->type() == RigidBody::EType::Dynamic ||
+                            mObjects[intervals[j].idx]->type() == RigidBody::EType::Dynamic)
+                        {
+                            overlaps[axis].emplace_back(intervals[i].idx, intervals[j].idx);
+                        }
+                    }
+                }
+            }
 
             // TODO: grab elements that occurred in all containers for the narrow test
+            std::set<std::pair<std::size_t, std::size_t>> set_x(overlaps[0].begin(), overlaps[0].end());
+            std::set<std::pair<std::size_t, std::size_t>> set_y(overlaps[1].begin(), overlaps[1].end());
+            std::set<std::pair<std::size_t, std::size_t>> set_z(overlaps[2].begin(), overlaps[2].end());
+
+            std::vector<std::pair<std::size_t, std::size_t>> intersection_xy;
+            std::set_intersection(set_x.begin(), set_x.end(),
+                                set_y.begin(), set_y.end(),
+                                std::back_inserter(intersection_xy));
+            std::vector<std::pair<std::size_t, std::size_t>> intersection_xyz;
+            std::set_intersection(intersection_xy.begin(), intersection_xy.end(),
+                                set_z.begin(), set_z.end(),
+                                std::back_inserter(intersection_xyz));
 
             // TODO: pass the intersections on to the narrow phase
+            mOverlappingBodys = intersection_xyz;
+
             break;
         }
-        }
+    }
     }
 
     void CollisionDetection::computeNarrowPhase()
@@ -210,8 +260,34 @@ namespace physsim
             Eigen::Vector3d rb = contact.p - contact.b->position();
 
             // TODO: compute impulse response
+            double invMassA = contact.a->massInverse();
+            double invMassB = contact.b->massInverse();
+            Eigen::Matrix3d invInertiaA = contact.a->inertiaWorldInverse();
+            Eigen::Matrix3d invInertiaB = contact.b->inertiaWorldInverse();
+
+            Eigen::Vector3d n = contact.n;
+
+            // Terms for denominator
+            Eigen::Vector3d ra_cross_n = ra.cross(n);
+            Eigen::Vector3d rb_cross_n = rb.cross(n);
+
+            double term1 = invMassA;
+            double term2 = invMassB;
+            double term3 = n.dot((invInertiaA * ra_cross_n).cross(ra));
+            double term4 = n.dot((invInertiaB * rb_cross_n).cross(rb));
+
+            double denom = term1 + term2 + term3 + term4;
+            if (denom == 0.0)
+                continue; // avoid division by zero
+
+            double j = -(1.0 + eps) * vrel / denom;
+            Eigen::Vector3d impulse = j * n;
 
             // TODO: apply impulse forces to the bodies at the contact point
+            contact.a->applyForce(-impulse, ra);
+            contact.b->applyForce( impulse, rb);
+
+
         }
     }
 
