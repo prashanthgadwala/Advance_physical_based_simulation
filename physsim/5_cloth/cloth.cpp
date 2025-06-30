@@ -170,6 +170,18 @@ namespace physsim
 
         // TODO: compute force
 
+        Eigen::Vector3f force = -stiffness * (spring_norm - L) * spring_dir;
+
         // TODO: add to acceleration
+        Eigen::Vector3f totalForce = force - damping * endVel + 
+                                     gravity * mass; // add damping and gravity
+
+        accelerations->setValue(endPoint.y() * mResolution.x() + endPoint.x(), endAcc + totalForce / mass);
+
+        // int startIdx = startPoint.y() * mResolution.x() + startPoint.x();
+        // if (mFixed.find(startIdx) == mFixed.end()) {
+        //     Eigen::Vector3f startAcc = accelerations->getValue(startIdx);
+        //     accelerations->setValue(startIdx, startAcc - force / mass);
+        // }
     }
 }
