@@ -387,7 +387,8 @@ namespace physsim
             for (Eigen::Index i = 0; i < mPositions->getSize(); ++i)
             {
                 // TODO: compute pressure p_i from mDensities, using mStiffness (k), mRho0 (rest density) and mExponent (gamma).
-                float pi = 0; // ... set correct value
+                float rhoi = mDensities->getValue(i).x();
+                float pi = mStiffness * (std::pow(rhoi / mRho0, mExponent) - 1.0f);
                 mPressures->setValue(i, pi);
             }
 
@@ -417,8 +418,18 @@ namespace physsim
                         float massj        = mMasses->getValue(n.first).x();
 
                         // TODO: pressure acceleration
+                        Eigen::Vector3f xij = xi - xj;
+                        Eigen::Vector3f grad_W_ij = W.gradW(xij);
+                        ai_p += -massj * (pi / (rhoi * rhoi) + pj / (rhoj * rhoj)) * grad_W_ij;
 
                         // TODO: viscosity acceleration
+                        Eigen::Vector3f vij = vi - vj;
+                        float dot_product = xij.dot(vij);
+                        float xij_norm_sq = xij.squaredNorm();
+                        float eta = 0.01f * mSupportRadius * mSupportRadius; // small epsilon to avoid division by zero
+                        float Pi_ij = mViscosity * dot_product / (rhoj) / (xij_norm_sq + eta);
+                        ai_p += massj * Pi_ij * grad_W_ij;
+
                     }
                 }
 
@@ -433,8 +444,17 @@ namespace physsim
                         float massk        = mBoundaryMasses->getValue(n.first).x();
 
                         // TODO: pressure acceleration (Akinci)
+                        Eigen::Vector3f xik = xi - xk;
+                        Eigen::Vector3f grad_W_ik = W.gradW(xik);
+                        ai_p += -massk * (pi / (rhoi * rhoi) + pi / (mRho0 * mRho0)) * grad_W_ik;
 
                         // TODO: viscosity acceleration (Akinci)
+                        Eigen::Vector3f vik = vi; // boundary velocity is zero, so vi - 0 = vi
+                        float dot_product = xik.dot(vik);
+                        float xik_norm_sq = xik.squaredNorm();
+                        float eta = 0.01f * mSupportRadius * mSupportRadius; // small epsilon to avoid division by zero
+                        float Pi_ik = mViscosity * dot_product / (mRho0) / (xik_norm_sq + eta);
+                        ai_p += massk * Pi_ik * grad_W_ik;
                     }
                 }
 

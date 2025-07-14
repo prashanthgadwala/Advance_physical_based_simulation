@@ -178,10 +178,5 @@ namespace physsim
 
         accelerations->setValue(endPoint.y() * mResolution.x() + endPoint.x(), endAcc + totalForce / mass);
 
-        // int startIdx = startPoint.y() * mResolution.x() + startPoint.x();
-        // if (mFixed.find(startIdx) == mFixed.end()) {
-        //     Eigen::Vector3f startAcc = accelerations->getValue(startIdx);
-        //     accelerations->setValue(startIdx, startAcc - force / mass);
-        // }
     }
 }
