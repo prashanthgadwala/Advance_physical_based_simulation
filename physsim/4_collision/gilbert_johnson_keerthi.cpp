@@ -16,11 +16,23 @@ namespace physsim
 
         // TODO: find first point on Minkoswki difference (store in c)
 
+        c = support(A, B, dir); // find first point on Minkowski difference
+
         // TODO: revert search direction
+
+        dir = -c.P ; // search direction is now towards the origin
 
         // TODO: find second point on Minkoswki difference (store in b)
 
+        b = support(A, B, dir); // find second point on Minkowski difference
+
         // TODO: early out, if we cannot contain the origin (dot product)
+
+        if (b.P.dot(dir) <= 0)
+        {
+            // no collision, origin is not contained in the simplex
+            return ret;
+        }
 
         // the next direction is perpendicular to line towards origin
         dir = (c.P - b.P).cross(-b.P).cross(c.P - b.P);
@@ -37,7 +49,15 @@ namespace physsim
         {
             // TODO: find next point (store in a)
 
+            a = support(A, B, dir); // find next point on Minkowski difference
+
             // TODO: early out, if we cannot contain the origin (dot product)
+
+            if (a.P.dot(dir) <= 0)
+            {
+                // no collision, origin is not contained in the simplex
+                return ret;
+            }
 
             // virtually add point a to simplex (technically, we have always allocate the memory for it)
             dim++;
@@ -55,7 +75,21 @@ namespace physsim
     Eigen::Vector3d GilbertJohnsonKeerthi::support(const TransformedMesh& mesh, const Eigen::Vector3d& d)
     {
         // TODO: find the vertex of V that is farthest into direction d.
-        return Eigen::Vector3d(0, 0, 0);
+        double max_dot = -std::numeric_limits<double>::infinity();
+        Eigen::Vector3d support_vertex;
+    
+        // Loop over all vertices in the mesh
+        for (Eigen::Index i = 0; i < mesh.vertices.size(); ++i)
+        {
+            Eigen::Vector3d v = mesh.getVertex(i); // get vertex in world coordinates
+            double dot = v.dot(d);
+            if (dot > max_dot)
+            {
+                max_dot = dot;
+                support_vertex = v;
+            }
+        }
+        return support_vertex;
     }
 
     GilbertJohnsonKeerthi::SupportVec GilbertJohnsonKeerthi::support(const TransformedMesh& A, const TransformedMesh& B, const Eigen::Vector3d& d)
