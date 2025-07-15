@@ -17,6 +17,13 @@ namespace physsim
     Eigen::Vector3d Wave::offset(const Eigen::Vector2d& position, const double& t) const
     {
         // TODO: compute the offset for the displaced wave from the given position.
-        return Eigen::Vector3d(0, 0, 0);
+                Eigen::Vector2d ki = waveVector();
+        double k = waveNumber();
+        Eigen::Vector3d waveHeight;
+        waveHeight.z() = amplitude * std::cos(ki.dot(position) - angularFrequency() * t + phase);
+
+        waveHeight.x() = - steepness * ki.x() / k * amplitude * std::sin(ki.dot(position) - angularFrequency() * t + phase);
+        waveHeight.y() = - steepness * ki.y() / k * amplitude * std::sin(ki.dot(position) - angularFrequency() * t + phase);
+        return waveHeight;
     }
 }
