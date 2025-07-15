@@ -79,7 +79,7 @@ namespace physsim
         Eigen::Vector3d support_vertex;
     
         // Loop over all vertices in the mesh
-        for (Eigen::Index i = 0; i < mesh.vertices.size(); ++i)
+        for (Eigen::Index i = 0; i < mesh.vertices.getSize(); ++i)
         {
             Eigen::Vector3d v = mesh.getVertex(i); // get vertex in world coordinates
             double dot = v.dot(d);
