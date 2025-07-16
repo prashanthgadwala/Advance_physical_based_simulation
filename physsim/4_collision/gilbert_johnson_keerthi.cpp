@@ -77,6 +77,8 @@ namespace physsim
         // TODO: find the vertex of V that is farthest into direction d.
         double max_dot = -std::numeric_limits<double>::infinity();
         Eigen::Vector3d support_vertex;
+        support_vertex.setZero(); // initialize to zero
+        
     
         // Loop over all vertices in the mesh
         for (Eigen::Index i = 0; i < mesh.vertices.getSize(); ++i)
