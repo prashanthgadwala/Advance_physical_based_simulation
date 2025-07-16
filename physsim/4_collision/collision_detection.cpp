@@ -106,7 +106,11 @@ namespace physsim
                         if (mObjects[intervals[i].idx]->type() == RigidBody::EType::Dynamic ||
                             mObjects[intervals[j].idx]->type() == RigidBody::EType::Dynamic)
                         {
-                            overlaps[axis].emplace_back(intervals[i].idx, intervals[j].idx);
+                            // Ensure consistent ordering of pairs (smaller index first)
+                            std::size_t idx1 = intervals[i].idx;
+                            std::size_t idx2 = intervals[j].idx;
+                            if (idx1 > idx2) std::swap(idx1, idx2);
+                            overlaps[axis].emplace_back(idx1, idx2);
                         }
                     }
                 }
@@ -249,9 +253,9 @@ namespace physsim
             // compute relative velocity and skip if the bodies are already moving apart
             Eigen::Vector3d vrel_vec = contact.b->velocity(contact.p) - contact.a->velocity(contact.p);
             double vrel              = contact.n.dot(vrel_vec);
-            if (vrel < 0)
+            if (vrel <= 0)
             {
-                // bodies are moving apart
+                // bodies are moving apart or stationary
                 continue;
             }
 
@@ -284,8 +288,13 @@ namespace physsim
             Eigen::Vector3d impulse = j * n;
 
             // TODO: apply impulse forces to the bodies at the contact point
-            contact.a->applyForce(-impulse, ra);
-            contact.b->applyForce( impulse, rb);
+            // For body A: apply -impulse
+            contact.a->setLinearVelocity(contact.a->linearVelocity() - impulse * invMassA);
+            contact.a->setAngularVelocity(contact.a->angularVelocity() - invInertiaA * ra_cross_n * j);
+            
+            // For body B: apply +impulse  
+            contact.b->setLinearVelocity(contact.b->linearVelocity() + impulse * invMassB);
+            contact.b->setAngularVelocity(contact.b->angularVelocity() + invInertiaB * rb_cross_n * j);
 
 
         }
