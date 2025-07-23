@@ -331,12 +331,6 @@ namespace physsim
                 {
                     for (int i = 0; i < mResolution.x(); ++i)
                     {
-                        // Pin pressure at (0,0) to zero like in linear solver
-                        if (i == 0 && j == 0) {
-                            mPressure->setVertexDataAt({ i, j }, 0);
-                            continue;
-                        }
-                        
                         float b = mDivergence->getVertexDataAt({ i, j }).x() / stepSize * rho; // right-hand
                         // TODO: update the pressure values
                         float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : mPressure->getVertexDataAt({ i, j }).x();
@@ -344,9 +338,11 @@ namespace physsim
                         float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : mPressure->getVertexDataAt({ i, j }).x();
                         float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : mPressure->getVertexDataAt({ i, j }).x();
                         
-                        int k = 4; // number of neighbors
-                        if (i == 0 || i == mResolution.x() - 1) k--;
-                        if (j == 0 || j == mResolution.y() - 1) k--;
+                        int k = 0;
+                        if (i > 0) k++;
+                        if (i < mResolution.x() - 1) k++;
+                        if (j > 0) k++;
+                        if (j < mResolution.y() - 1) k++;
                         
                         float new_pressure = (p_left + p_right + p_bottom + p_top - dx2 * b) / k;
                         mPressure->setVertexDataAt({ i, j }, new_pressure);
@@ -357,28 +353,23 @@ namespace physsim
 
             // Compute the new residual, i.e. the sum of the squares of the individual residuals (squared L2-norm)
             residual = 0;
-            int residual_count = 0;
-            for (int j = 0; j < mResolution.y(); ++j)
+            for (int j = 1; j < mResolution.y() - 1; ++j)
             {
-                for (int i = 0; i < mResolution.x(); ++i)
+                for (int i = 1; i < mResolution.x() - 1; ++i)
                 {
-                    // Skip pinned pressure value for closed boundaries
-                    if (boundary == EBoundary::Closed && i == 0 && j == 0) {
-                        continue;
-                    }
-                    
                     float b = mDivergence->getVertexDataAt({ i, j }).x() / stepSize * rho; // right-hand
                     // TODO: compute the cell residual
                     float p_center = mPressure->getVertexDataAt({ i, j }).x();
                     
-                    float laplacian;
                     if (boundary == EBoundary::Open) {
                         // For open boundaries, use simple Laplacian with zero boundaries
                         float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : 0;
                         float p_right = (i < mResolution.x() - 1) ? mPressure->getVertexDataAt({ i + 1, j }).x() : 0;
                         float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : 0;
                         float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : 0;
-                        laplacian = (p_left + p_right + p_bottom + p_top - 4.0f * p_center) / dx2;
+                        float cell_residual = b - (-4*p_center + p_left + p_right + p_bottom + p_top) / dx2;
+                        residual += cell_residual * cell_residual; // accumulate squared residual
+
                     } else {
                         // For closed boundaries, use Neumann-consistent Laplacian
                         float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : p_center;
@@ -386,16 +377,16 @@ namespace physsim
                         float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : p_center;
                         float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : p_center;
                         
-                        int k = 4; // number of neighbors
-                        if (i == 0 || i == mResolution.x() - 1) k--;
-                        if (j == 0 || j == mResolution.y() - 1) k--;
-                        
-                        laplacian = (p_left + p_right + p_bottom + p_top - k * p_center) / dx2;
+                        int k = 0;
+                        if (i > 0) k++;
+                        if (i < mResolution.x() - 1) k++;
+                        if (j > 0) k++;
+                        if (j < mResolution.y() - 1) k++;
+
+                        float cell_residual = b - (-k * p_center + p_left + p_right + p_bottom + p_top) / dx2;
+                        residual += cell_residual * cell_residual; // accumulate squared residual
                     }
-                    
-                    float cell_residual = laplacian - b;
-                    residual += cell_residual * cell_residual;
-                    residual_count++;
+
                 }
             }
 
@@ -403,9 +394,7 @@ namespace physsim
             residual = sqrt(residual);
 
             // We assume the accuracy is meant for the average L2-norm per grid cell
-            if (residual_count > 0) {
-                residual /= residual_count;
-            }
+            residual /= (mResolution.x() - 2) * (mResolution.y() - 2);
         }
     }
 
@@ -417,14 +406,8 @@ namespace physsim
         // right hand side
         Eigen::VectorXd b(mResolution.x() * mResolution.y());
         for (int j = 0; j < mResolution.y(); ++j)
-            for (int i = 0; i < mResolution.x(); ++i) {
-                if (boundary == EBoundary::Closed && i == 0 && j == 0) {
-                    // Pin pressure at (0,0) to zero for closed boundaries
-                    b(j * (std::size_t)mResolution.x() + i) = 0;
-                } else {
-                    b(j * (std::size_t)mResolution.x() + i) = mDivergence->getVertexDataAt({ i, j }).x() / stepSize * rho * dx2;
-                }
-            }
+            for (int i = 0; i < mResolution.x(); ++i)
+                b(j * (std::size_t)mResolution.x() + i) = mDivergence->getVertexDataAt({ i, j }).x() / stepSize * rho * dx2;
 
         // solve sparse linear SPD system
         Eigen::VectorXd pout = mPoissonFactorization.solve(b);
@@ -496,34 +479,19 @@ namespace physsim
         //     ------O-------------O--------
         //        v_i-1,j        v_i,j
 
-        // Get actual grid resolutions for staggered grids
-        Eigen::Vector2i resu = mVelocity_u->getGrid()->getResolution();
-        Eigen::Vector2i resv = mVelocity_v->getGrid()->getResolution();
-
         // Velocities (u), MAC grid
         for (int j = 0; j < mResolution.y(); ++j)
         {
             for (int i = 1; i < mResolution.x(); ++i)
             { // skip first and last row: those are determined by the boundary condition
                 // TODO: Compute the velocity
-                // For u-velocity, we need to interpolate from surrounding velocities
                 float u_current = mVelocity_u->getVertexDataAt({ i, j }).x();
                 
-                // Check bounds properly for v-velocity access
-                // v_left: need to access { i-1, j } and { i, j }
-                // v_right: need to access { i-1, j+1 } and { i, j+1 }
-                float v_left = 0;
-                float v_right = 0;
-                
-                if (j > 0 && i > 0 && i - 1 < resv.x()) {
-                    v_left = (mVelocity_v->getVertexDataAt({ i - 1, j }).x() + 
-                             (i < resv.x() ? mVelocity_v->getVertexDataAt({ i, j }).x() : 0)) / 2.0f;
-                }
-                if (j < resv.y() - 1 && i > 0 && i - 1 < resv.x()) {
-                    v_right = (mVelocity_v->getVertexDataAt({ i - 1, j + 1 }).x() + 
-                              (i < resv.x() ? mVelocity_v->getVertexDataAt({ i, j + 1 }).x() : 0)) / 2.0f;
-                }
-                
+                float v_left = (mVelocity_v->getVertexDataAt({ i - 1, j + 1 }).x() + 
+                               mVelocity_v->getVertexDataAt({ i - 1, j }).x()) / 2.0f;
+                float v_right = (mVelocity_v->getVertexDataAt({ i , j + 1 }).x() + 
+                                mVelocity_v->getVertexDataAt({ i, j }).x()) / 2.0f;
+
                 float last_x_velocity = u_current;
                 float last_y_velocity = (v_left + v_right) / 2.0f;
 
@@ -531,21 +499,21 @@ namespace physsim
                 float last_x = i - stepSize * last_x_velocity / mSpacing.x();
                 float last_y = j - stepSize * last_y_velocity / mSpacing.y();
 
-                // Make sure the coordinates are inside the boundaries - USE ACTUAL U-VELOCITY GRID SIZE
+                // Make sure the coordinates are inside the boundaries
                 if (last_x < 0)
                     last_x = 0;
                 if (last_y < 0)
                     last_y = 0;
-                if (last_x >= resu.x())
-                    last_x = resu.x() - 1;
-                if (last_y >= resu.y())
-                    last_y = resu.y() - 1;
+                if (last_x > mResolution.x() - 0)
+                    last_x = mResolution.x() - 0;
+                if (last_y > mResolution.y() - 1)
+                    last_y = mResolution.y() - 1;
 
                 // Determine corners for bilinear interpolation
                 int x_low  = (int)last_x;
                 int y_low  = (int)last_y;
-                int x_high = std::min(x_low + 1, resu.x() - 1);
-                int y_high = std::min(y_low + 1, resu.y() - 1);
+                int x_high = std::min(x_low + 1, mResolution.x());
+                int y_high = std::min(y_low + 1, mResolution.y() - 1);
 
                 // Compute the interpolation weights
                 float x_weight = last_x - x_low;
@@ -581,21 +549,11 @@ namespace physsim
             for (int i = 0; i < mResolution.x(); ++i)
             {
                 // TODO: Compute the velocity
-                // For v-velocity, we need to interpolate from surrounding velocities
                 float v_current = mVelocity_v->getVertexDataAt({ i, j }).x();
-                
-                // Check bounds properly for u-velocity access 
-                // u_bottom: need to access { i, j-1 } and { i+1, j-1 }
-                // u_top: need to access { i, j } and { i+1, j }
-                float u_bottom = 0;
-                float u_top = 0;
-                
-                if (j > 0 && i < resu.x() - 1) {
-                    u_bottom = (mVelocity_u->getVertexDataAt({ i, j - 1 }).x() + mVelocity_u->getVertexDataAt({ i + 1, j - 1 }).x()) / 2.0f;
-                }
-                if (i < resu.x() - 1) {
-                    u_top = (mVelocity_u->getVertexDataAt({ i, j }).x() + mVelocity_u->getVertexDataAt({ i + 1, j }).x()) / 2.0f;
-                }
+                float u_bottom = (mVelocity_u->getVertexDataAt({ i, j - 1 }).x() + 
+                                  mVelocity_u->getVertexDataAt({ i + 1, j - 1 }).x()) / 2.0f;
+                float u_top = (mVelocity_u->getVertexDataAt({ i, j }).x() + 
+                                  mVelocity_u->getVertexDataAt({ i + 1, j }).x()) / 2.0f;
                 
                 float last_x_velocity = (u_bottom + u_top) / 2.0f;
                 float last_y_velocity = v_current;
@@ -604,21 +562,21 @@ namespace physsim
                 float last_x = i - stepSize * last_x_velocity / mSpacing.x();
                 float last_y = j - stepSize * last_y_velocity / mSpacing.y();
 
-                // Make sure the coordinates are inside the boundaries - USE ACTUAL V-VELOCITY GRID SIZE
+                // Make sure the coordinates are inside the boundaries
                 if (last_x < 0)
                     last_x = 0;
                 if (last_y < 0)
                     last_y = 0;
-                if (last_x >= resv.x())
-                    last_x = resv.x() - 1;
-                if (last_y >= resv.y())
-                    last_y = resv.y() - 1;
+                if (last_x > mResolution.x() - 1)
+                    last_x = mResolution.x() - 1;
+                if (last_y > mResolution.y() - 0)
+                    last_y = mResolution.y() - 0;
 
                 // Determine corners for bilinear interpolation
                 int x_low  = (int)last_x;
                 int y_low  = (int)last_y;
-                int x_high = std::min(x_low + 1, resv.x() - 1);
-                int y_high = std::min(y_low + 1, resv.y() - 1);
+                int x_high = std::min(x_low + 1, mResolution.x() - 1);
+                int y_high = std::min(y_low + 1, mResolution.y() - 0);
 
                 // Compute the interpolation weights
                 float x_weight = last_x - x_low;
@@ -666,7 +624,6 @@ namespace physsim
             for (int i = 0; i < mResolution.x(); ++i)
             {
                 // TODO: Compute the velocity
-                // For density, we need to interpolate velocity from the staggered MAC grid
                 float u_left = mVelocity_u->getVertexDataAt({ i, j }).x();
                 float u_right = mVelocity_u->getVertexDataAt({ i + 1, j }).x();
                 float v_bottom = mVelocity_v->getVertexDataAt({ i, j }).x();
@@ -729,51 +686,66 @@ namespace physsim
         for (int j = 0; j < resolution.y(); ++j)
             for (int i = 0; i < resolution.x(); ++i)
             {
-                int row = j * resolution.x() + i;
-                
+
+                if (i > 0)
+                    coeff.push_back(Eigen::Triplet<double>(j * resolution.x() + i, j * resolution.x() + i - 1, 1));
+                if (i < resolution.x() - 1)
+                    coeff.push_back(Eigen::Triplet<double>(j * resolution.x() + i, j * resolution.x() + i + 1, 1));
+                if (j > 0)
+                    coeff.push_back(Eigen::Triplet<double>(j * resolution.x() + i, (j - 1) * resolution.x() + i, 1));
+                if (j < resolution.y() - 1)
+                    coeff.push_back(Eigen::Triplet<double>(j * resolution.x() + i, (j + 1) * resolution.x() + i, 1));
+
                 switch (boundary)
                 {
-                case EBoundary::Open: // Dirichlet condition: smooth continuation
-                    coeff.push_back(Eigen::Triplet<double>(row, row, -4));
-                    // Add neighbors
-                    if (i > 0) 
-                        coeff.push_back(Eigen::Triplet<double>(row, row - 1, 1)); // left
-                    if (i < resolution.x() - 1) 
-                        coeff.push_back(Eigen::Triplet<double>(row, row + 1, 1)); // right
-                    if (j > 0) 
-                        coeff.push_back(Eigen::Triplet<double>(row, row - resolution.x(), 1)); // bottom
-                    if (j < resolution.y() - 1) 
-                        coeff.push_back(Eigen::Triplet<double>(row, row + resolution.x(), 1)); // top
+                case EBoundary::Open: // dirichlet condition: smooth continuation
+                    // example for 4x4 matrix
+                    // -4  1  0  0  1  0  0  0  0  0  0  0  0  0  0  0
+                    //  1 -4  1  0  0  1  0  0  0  0  0  0  0  0  0  0
+                    // 	0  1 -4  1  0  0  1  0  0  0  0  0  0  0  0  0
+                    // 	0  0  1 -4  0  0  0  1  0  0  0  0  0  0  0  0
+                    //  1  0  0  0 -4  1  0  0  1  0  0  0  0  0  0  0
+                    // 	0  1  0  0  1 -4  1  0  0  1  0  0  0  0  0  0
+                    // 	0  0  1  0  0  1 -4  1  0  0  1  0  0  0  0  0
+                    // 	0  0  0  1  0  0  1 -4  0  0  0  1  0  0  0  0
+                    // 	0  0  0  0  1  0  0  0 -4  1  0  0  1  0  0  0
+                    // 	0  0  0  0  0  1  0  0  1 -4  1  0  0  1  0  0
+                    // 	0  0  0  0  0  0  1  0  0  1 -4  1  0  0  1  0
+                    // 	0  0  0  0  0  0  0  1  0  0  1 -4  0  0  0  1
+                    // 	0  0  0  0  0  0  0  0  1  0  0  0 -4  1  0  0
+                    // 	0  0  0  0  0  0  0  0  0  1  0  0  1 -4  1  0
+                    // 	0  0  0  0  0  0  0  0  0  0  1  0  0  1 -4  1
+                    // 	0  0  0  0  0  0  0  0  0  0  0  1  0  0  1 -4
+
+                    coeff.push_back(Eigen::Triplet<double>(j * resolution.x() + i, j * resolution.x() + i, -4));
+
                     break;
-                    
-                case EBoundary::Closed: // Neumann condition: forward/backward difference on boundary
-                    // For closed boundaries with Neumann conditions, we need to fix one pressure value
-                    // to make the system non-singular (pressure is only defined up to a constant)
-                    if (i == 0 && j == 0) {
-                        // Pin the pressure at (0,0) to zero
-                        coeff.push_back(Eigen::Triplet<double>(row, row, 1));
-                    } else {
-                        int neighbors = 0;
-                        // Count actual neighbors and add them
-                        if (i > 0) {
-                            coeff.push_back(Eigen::Triplet<double>(row, row - 1, 1)); // left
-                            neighbors++;
-                        }
-                        if (i < resolution.x() - 1) {
-                            coeff.push_back(Eigen::Triplet<double>(row, row + 1, 1)); // right
-                            neighbors++;
-                        }
-                        if (j > 0) {
-                            coeff.push_back(Eigen::Triplet<double>(row, row - resolution.x(), 1)); // bottom
-                            neighbors++;
-                        }
-                        if (j < resolution.y() - 1) {
-                            coeff.push_back(Eigen::Triplet<double>(row, row + resolution.x(), 1)); // top
-                            neighbors++;
-                        }
-                        // Diagonal entry is negative number of neighbors
-                        coeff.push_back(Eigen::Triplet<double>(row, row, -neighbors));
-                    }
+
+                case EBoundary::Closed: // Neumann condition: forward/backward difference on boundary   (same pattern of -1's, but the main diagonal contains the number of -1's per row)
+                    // -2  1  0  0  1  0  0  0  0  0  0  0  0  0  0  0
+                    //  1 -3  1  0  0  1  0  0  0  0  0  0  0  0  0  0
+                    //	0  1 -3  1  0  0  1  0  0  0  0  0  0  0  0  0
+                    //	0  0  1 -2  0  0  0  1  0  0  0  0  0  0  0  0
+                    //  1  0  0  0 -3  1  0  0  1  0  0  0  0  0  0  0
+                    //	0  1  0  0  1 -4  1  0  0  1  0  0  0  0  0  0
+                    //	0  0  1  0  0  1 -4  1  0  0  1  0  0  0  0  0
+                    //	0  0  0  1  0  0  1 -3  0  0  0  1  0  0  0  0
+                    //	0  0  0  0  1  0  0  0 -3  1  0  0  1  0  0  0
+                    //	0  0  0  0  0  1  0  0  1 -4  1  0  0  1  0  0
+                    //	0  0  0  0  0  0  1  0  0  1 -4  1  0  0  1  0
+                    //	0  0  0  0  0  0  0  1  0  0  1 -3  0  0  0  1
+                    //	0  0  0  0  0  0  0  0  1  0  0  0 -2  1  0  0
+                    //	0  0  0  0  0  0  0  0  0  1  0  0  1 -3  1  0
+                    //	0  0  0  0  0  0  0  0  0  0  1  0  0  1 -3  1
+                    //	0  0  0  0  0  0  0  0  0  0  0  1  0  0  1 -2
+
+                    int k= 0; // number of -1's per row
+                    if (i > 0) k++;
+                    if (i < resolution.x() - 1) k++;
+                    if (j > 0) k++;
+                    if (j < resolution.y() - 1) k++;
+                    coeff.push_back(Eigen::Triplet<double>(j * resolution.x() + i, j * resolution.x() + i, -k));
+
                     break;
                 }
             }

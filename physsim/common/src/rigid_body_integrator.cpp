@@ -93,6 +93,7 @@ namespace physsim
 
     void implicitEuler(RigidBody& body, double stepSize)
     {
+        // See for explanations: https://www.gdcvault.com/play/1022196/Physics-for-Game-Programmers-Numerical
         // Get current state
         Eigen::Vector3d x    = body.position();
         Eigen::Quaterniond q = body.rotation();
