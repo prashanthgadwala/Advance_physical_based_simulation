@@ -123,7 +123,7 @@ namespace physsim
         Eigen::Vector3d delta_wb_explicit = stepSize * Ib_inv * tau_body;
     
         // Initial guess for ωb (body coords) after explicit update
-        Eigen::Vector3d wb = wb0 + delta_wb_explicit;
+        Eigen::Vector3d wb = wb0 ;
     
         // 2. Newton step for implicit gyroscopic torque
         // f(wb) = Ib(wb - wb0) + dt * wb × (Ib * wb)
@@ -138,7 +138,7 @@ namespace physsim
         Eigen::Vector3d delta_wb = J.colPivHouseholderQr().solve(-fwb);
     
         // Update ωb
-        wb += delta_wb;
+        wb += delta_wb + delta_wb_explicit;
     
         // Transform back to world coordinates
         Eigen::Vector3d wnew = q * wb;

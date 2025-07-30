@@ -11,6 +11,9 @@ project(vislab
 include(FetchContent)
 include(cmake/enableIdeSupport.cmake)
 
+
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Release, Debug, RelWithDebInfo, MinSizeRel)" FORCE)
+
 # ------------------------------------
 # ------------ Options ---------------
 # ------------------------------------

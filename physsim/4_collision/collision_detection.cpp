@@ -287,14 +287,18 @@ namespace physsim
             double j = -(1.0 + eps) * vrel / denom;
             Eigen::Vector3d impulse = j * n;
 
-            // TODO: apply impulse forces to the bodies at the contact point
-            // For body A: apply -impulse
-            contact.a->setLinearVelocity(contact.a->linearVelocity() - impulse * invMassA);
-            contact.a->setAngularVelocity(contact.a->angularVelocity() - invInertiaA * ra_cross_n * j);
+            // // TODO: apply impulse forces to the bodies at the contact point
+            // // For body A: apply -impulse
+            // contact.a->setLinearVelocity(contact.a->linearVelocity() - impulse * invMassA);
+            // contact.a->setAngularVelocity(contact.a->angularVelocity() - invInertiaA * ra_cross_n * j);
             
-            // For body B: apply +impulse  
-            contact.b->setLinearVelocity(contact.b->linearVelocity() + impulse * invMassB);
-            contact.b->setAngularVelocity(contact.b->angularVelocity() + invInertiaB * rb_cross_n * j);
+            // // For body B: apply +impulse  
+            // contact.b->setLinearVelocity(contact.b->linearVelocity() + impulse * invMassB);
+            // contact.b->setAngularVelocity(contact.b->angularVelocity() + invInertiaB * rb_cross_n * j);
+
+
+            contact.a->applyForce(-impulse/stepSize, contact.p);
+            contact.b->applyForce(impulse/stepSize, contact.p);
 
 
         }

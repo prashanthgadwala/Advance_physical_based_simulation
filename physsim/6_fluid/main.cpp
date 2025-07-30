@@ -31,7 +31,7 @@ namespace physsim
         {
             // simulation settings
             mBoundary       = FluidSolver::EBoundary::Closed;
-            mPressureSolver = FluidSolver::EPressureSolver::Iterative;
+            mPressureSolver = FluidSolver::EPressureSolver::Linear;
             mAccuracy       = 1E-3;
             mIterations     = 1000;
 

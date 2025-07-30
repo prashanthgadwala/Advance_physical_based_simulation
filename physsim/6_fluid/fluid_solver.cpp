@@ -333,11 +333,11 @@ namespace physsim
                     {
                         float b = mDivergence->getVertexDataAt({ i, j }).x() / stepSize * rho; // right-hand
                         // TODO: update the pressure values
-                        float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : mPressure->getVertexDataAt({ i, j }).x();
-                        float p_right = (i < mResolution.x() - 1) ? mPressure->getVertexDataAt({ i + 1, j }).x() : mPressure->getVertexDataAt({ i, j }).x();
-                        float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : mPressure->getVertexDataAt({ i, j }).x();
-                        float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : mPressure->getVertexDataAt({ i, j }).x();
-                        
+                        float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : 0;
+                        float p_right = (i < mResolution.x() - 1) ? mPressure->getVertexDataAt({ i + 1, j }).x() : 0;
+                        float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : 0;
+                        float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : 0;
+
                         int k = 0;
                         if (i > 0) k++;
                         if (i < mResolution.x() - 1) k++;
@@ -353,6 +353,7 @@ namespace physsim
 
             // Compute the new residual, i.e. the sum of the squares of the individual residuals (squared L2-norm)
             residual = 0;
+            float cell_residual = 0;
             for (int j = 1; j < mResolution.y() - 1; ++j)
             {
                 for (int i = 1; i < mResolution.x() - 1; ++i)
@@ -367,25 +368,28 @@ namespace physsim
                         float p_right = (i < mResolution.x() - 1) ? mPressure->getVertexDataAt({ i + 1, j }).x() : 0;
                         float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : 0;
                         float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : 0;
-                        float cell_residual = b - (-4*p_center + p_left + p_right + p_bottom + p_top) / dx2;
-                        residual += cell_residual * cell_residual; // accumulate squared residual
+                        cell_residual = b - (-4*p_center + p_left + p_right + p_bottom + p_top) / dx2;
+                        // residual += cell_residual * cell_residual; // accumulate squared residual
 
                     } else {
                         // For closed boundaries, use Neumann-consistent Laplacian
-                        float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : p_center;
-                        float p_right = (i < mResolution.x() - 1) ? mPressure->getVertexDataAt({ i + 1, j }).x() : p_center;
-                        float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : p_center;
-                        float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : p_center;
-                        
+                        float p_left = (i > 0) ? mPressure->getVertexDataAt({ i - 1, j }).x() : 0;
+                        float p_right = (i < mResolution.x() - 1) ? mPressure->getVertexDataAt({ i + 1, j }).x() : 0;
+                        float p_bottom = (j > 0) ? mPressure->getVertexDataAt({ i, j - 1 }).x() : 0;
+                        float p_top = (j < mResolution.y() - 1) ? mPressure->getVertexDataAt({ i, j + 1 }).x() : 0;
+
                         int k = 0;
                         if (i > 0) k++;
                         if (i < mResolution.x() - 1) k++;
                         if (j > 0) k++;
                         if (j < mResolution.y() - 1) k++;
+                    
 
-                        float cell_residual = b - (-k * p_center + p_left + p_right + p_bottom + p_top) / dx2;
-                        residual += cell_residual * cell_residual; // accumulate squared residual
+                        cell_residual = b - (-k * p_center + p_left + p_right + p_bottom + p_top) / dx2;
+                        
                     }
+
+                    residual += cell_residual * cell_residual; // accumulate squared residual
 
                 }
             }
